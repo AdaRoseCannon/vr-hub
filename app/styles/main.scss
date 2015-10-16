@@ -1,0 +1,15 @@
+
+html, body {
+	height: 100%;
+	margin: 0;
+	font-family: 'Iceland', 'open-sans', 'helvetica', 'sans';
+	overflow: hidden;
+}
+
+#cardboard {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 200px;
+	z-index: 100;
+}

@@ -1,0 +1,29 @@
+{
+	"eqeqeq": true,
+	"forin": true,
+	"freeze": true,
+	"immed": true,
+	"newcap": true,
+	"noarg": true,
+	"nonbsp": true,
+	"undef": true,
+	"unused": "vars",
+	"strict": true,
+	"trailing": true,
+	"quotes": false,
+	"curly": false,
+	"space-infix-ops": false,
+	"no-use-before-define": false,
+
+	"esnext": true,
+	"expr": true,
+	"gcl": true,
+	"globalstrict": true,
+	"lastsemic": true,
+	"multistr": true,
+	"smarttabs": true,
+	"sub": true,
+
+	"browser": true,
+	"nonstandard": true
+}

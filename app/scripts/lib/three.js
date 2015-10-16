@@ -16,7 +16,7 @@ reflectionCube.format = THREE.RGBFormat;
 
 const materials = {
 	shiny: new THREE.MeshPhongMaterial( { color: 0x99ff99, specular: 0x440000, envMap: reflectionCube, combine: THREE.MixOperation, reflectivity: 0.3, metal: true} ),
-	boring2: new THREE.MeshPhongMaterial( { color: 0xC0B9BB, specular: 0, shading: THREE.FlatShading } ),
+	boring2: new THREE.MeshPhongMaterial( { color: 0xC0B9BB, specular: 0, shading: THREE.FlatShading, side: THREE.DoubleSide, transparent: true, opacity: 0.95 } ),
 	wireframe: new THREE.MeshBasicMaterial( { color: 0xFFFFFF, wireframe: true } )
 };
 
@@ -35,30 +35,32 @@ function MyThree(scene, target = document.body){
 
 	this.scene = scene || new THREE.Scene();
 
-	const camera = new THREE.PerspectiveCamera( 75, target.scrollWidth / target.scrollHeight, 0.1, 100 );
+	const camera = new THREE.PerspectiveCamera( 75, target.scrollWidth / target.scrollHeight, 2, 20 );
 	camera.height = 2;
 	camera.position.set(0, camera.height, 0);
 	camera.lookAt(new THREE.Vector3(0, camera.height, -9));
 	camera.rotation.y += Math.PI;
 	this.camera = camera;
+
+	const hud = new THREE.Object3D();
+	hud.position.set(0, 0, -2.1);
+	hud.scale.set(0.2, 0.2, 0.2);
+	camera.add(hud);
+	scene.add(camera);
+	this.hud = hud;
+
+	const renderer = new THREE.WebGLRenderer( { antialias: false, alpha: true } );
+	renderer.setPixelRatio( window.devicePixelRatio );
+	
+	this.renderMethod = renderer;
 	
 	const setAspect = () => {
-		renderer.setSize( target.scrollWidth, target.scrollHeight );
+		this.renderMethod.setSize( target.scrollWidth, target.scrollHeight );
 		camera.aspect = target.scrollWidth / target.scrollHeight;
 		camera.updateProjectionMatrix();
 	};
-
-	const hud = new THREE.Object3D();
-	hud.position.set(0, 0, -0.2);
-	hud.scale.set(0.02, 0.02, 0.02);
-	camera.add(hud);
-	this.hud = hud;
-
-	const renderer = new THREE.WebGLRenderer( { antialias: true } );
-	renderer.setPixelRatio( window.devicePixelRatio );
+	window.addEventListener('resize', setAspect);
 	setAspect();
-	
-	this.renderMethod = renderer;
 
 	target.appendChild(renderer.domElement);
 	this.domElement = renderer.domElement;
@@ -74,15 +76,27 @@ function MyThree(scene, target = document.body){
 
 	this.on('prerender', function updatePositions() {
 
+		const l = physicsObjects.length;
+
 		// iterate over the physics physicsObjects
-		for ( let i of physicsObjects ) {
+		for ( let i,j=0; j<l;j++ ) {
 
+			const i = physicsObjects[j];
 			if (threeObjectsConnectedToPhysics[i.id]) {
-				threeObjectsConnectedToPhysics[i.id].position.set(i.position.x, i.position.y, i.position.z);
 
-				// Don't set quaternian
+				const o = threeObjectsConnectedToPhysics[i.id];
+
+				// Support maniplating a single vertex
+				if (o.constructor === THREE.Vector3) {
+					o.set(i.position.x, i.position.y, i.position.z);
+					continue;
+				}
+
+				o.position.set(i.position.x, i.position.y, i.position.z);
+
+				// Rotation
 				if (i.quaternion) {
-					threeObjectsConnectedToPhysics[i.id].rotation.setFromQuaternion(new THREE.Quaternion(i.quaternion.x, i.quaternion.y, i.quaternion.z, i.quaternion.w));
+					o.rotation.setFromQuaternion(new THREE.Quaternion(i.quaternion.x, i.quaternion.y, i.quaternion.z, i.quaternion.w));
 				}
 			}
 		}
@@ -92,6 +106,7 @@ function MyThree(scene, target = document.body){
 
 	this.connectPhysicsToThree = (mesh, physicsMesh) => {
 		threeObjectsConnectedToPhysics[physicsMesh.id] = mesh;
+		if (mesh.constructor === THREE.Vector3) return;
 		scene.add(mesh);
 	};
 

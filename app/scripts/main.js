@@ -46,11 +46,11 @@ serviceWorker()
 	console.log('Ready');
 
 	const dome = three.pickObjects(three.scene, 'dome').dome;
+	three.scene.remove(dome);
 
 	const grid = new THREE.GridHelper( 10, 1 );
 	grid.setColors( 0xff0000, 0xffffff );
 	three.scene.add( grid );
-
 
 	// Brand lights
 	const ambientLight = new THREE.AmbientLight( 0xc0b9bb );
@@ -76,11 +76,11 @@ serviceWorker()
 	const verlet = new VerletWrapper();
 	verlet.init({
 		size: {
-			x: 10,
-			y: 10,
-			z: 10,
+			x: 20,
+			y: 20,
+			z: 20,
 		},
-		gravity: false
+		gravity: true
 	})
 	.then(function () {
 			
@@ -97,9 +97,89 @@ serviceWorker()
 		const sprite = new THREE.Sprite(material);
 		three.hud.add(sprite);
 
+		window.dome = dome.geometry;
+		require('./lib/breakGeometryIntoVerletFaces')(dome.geometry, three, verlet, 0.5, 0.8)
+		.then(function (newGeom) {
+
+			const timeouts = [];
+			const fallRate = 500;
+			const newDome = new THREE.Mesh(
+				newGeom,
+				three.materials.boring2
+			);
+			three.scene.add(newDome);
+
+			three.on('prerender', function () {
+				newGeom.verticesNeedUpdate = true;
+				newGeom.normalsNeedUpdate = true;
+			});
+
+			function faceFall(f) {
+				f.positionConstraintIds.forEach(constraintId => {
+					timeouts.push(setTimeout(() => verlet.updateConstraint({
+						constraintId,
+						stiffness: 0
+					}), Math.random() * fallRate * 0.5));
+				});
+				f.vertexVerletIds.forEach(id => {
+					timeouts.push(setTimeout(() => verlet.updatePoint({
+						id,
+						mass: 1,
+						velocity: {
+							x: 0.5 * (Math.random() - 0.5),
+							y: 0.5 * (Math.random() - 0.5),
+							z: 0.5 * (Math.random() - 0.5),
+						}
+					}), Math.random() * fallRate * 0.5));
+				});
+			}
+
+			function recursiveFall(startFace) {
+				faceFall(startFace);
+				startFace.adjacentFaces.forEach(f => {
+					if (!f.falling) {
+						f.falling = true;
+						timeouts.push(setTimeout(() => recursiveFall(f), fallRate));
+					}
+				});
+			}
+
+			window.addEventListener('dblclick', function () {
+				while(timeouts.length) {
+					clearTimeout(timeouts.pop());
+				}
+				newGeom.positionConstraintIds.forEach(constraintId => {
+					verlet.updateConstraint({constraintId, stiffness: 0.3 });
+					timeouts.push(setTimeout(() => verlet.updateConstraint({constraintId, stiffness: 0.4 }), 1000));
+					timeouts.push(setTimeout(() => verlet.updateConstraint({constraintId, stiffness: 0.5 }), 2000));
+				});
+				newGeom.vertexVerletIds.forEach(id => {
+					timeouts.push(setTimeout(() => verlet.updatePoint({
+						id,
+						mass: 0,
+						position: {
+							x: newGeom.vertexVerletPositions[id].x,
+							y: newGeom.vertexVerletPositions[id].y,
+							z: newGeom.vertexVerletPositions[id].z
+						}
+					}), 2000 * Math.random()));
+				});
+				newGeom.faces.forEach(face => face.falling = false);
+			});
+
+			window.addEventListener('click', function () {
+				const raycaster = new THREE.Raycaster();
+				raycaster.setFromCamera(new THREE.Vector2(0,0), three.camera);
+				const hits = raycaster.intersectObjects([newDome]);
+				if (hits.length) {
+					recursiveFall(hits[0].face);
+				}
+			});
+		});
+
+
 		function reset() {
 			three.camera.position.set(0, three.camera.height, 0);
-
 		}
 
 		// Set initial properties

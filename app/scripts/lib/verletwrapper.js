@@ -8,22 +8,17 @@ function workerMessage(message) {
 	// contain an error, and reject with the error if it does. If you'd prefer, it's possible to call
 	// controller.postMessage() and set up the onmessage handler independently of a promise, but this is
 	// a convenient wrapper.
-	return new Promise(function(resolve, reject) {
+	return new Promise(function workerMessagePromise(resolve, reject) {
 		const messageChannel = new MessageChannel();
-		messageChannel.port1.onmessage = function(event) {
+		messageChannel.port1.onmessage = function resolveMessagePromise(event) {
+			messageChannel.port1.onmessage = undefined;
 			if (event.data.error) {
-				messageChannel.port1.onmessage = undefined;
 				reject(event.data.error);
 			} else {
-				messageChannel.port1.onmessage = undefined;
-				resolve(event.data);
+				resolve(JSON.parse(event.data));
 			}
 		};
 
-		// This sends the message data as well as transferring messageChannel.port2 to the service worker.
-		// The service worker can then use the transferred port to reply via postMessage(), which
-		// will in turn trigger the onmessage handler on messageChannel.port1.
-		// See https://html.spec.whatwg.org/multipage/workers.html#dom-worker-postmessage
 		myWorker.postMessage(message, [messageChannel.port2]);
 	});
 }
@@ -42,8 +37,16 @@ class Verlet {
 		return workerMessage({action: 'addPoint', pointOptions});
 	}
 
+	updatePoint(pointOptions) {
+		return workerMessage({action: 'updatePoint', pointOptions});
+	}
+
 	connectPoints(p1, p2, constraintOptions) {
 		return workerMessage({action: 'connectPoints', options: {p1, p2, constraintOptions}});
+	}
+
+	updateConstraint(options) {
+		return workerMessage({action: 'updateConstraint', options });
 	}
 
 	reset() {

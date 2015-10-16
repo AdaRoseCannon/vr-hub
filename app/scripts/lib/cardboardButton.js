@@ -19,7 +19,6 @@ module.exports = function (three) {
 
 		removeCardboardButton();
 		three.useCardboard();
-		window.addEventListener('resize', three.useCardboard);
 
 		if (container.requestFullscreen) {
 			container.requestFullscreen();

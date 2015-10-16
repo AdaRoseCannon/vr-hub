@@ -27,13 +27,11 @@ function MyVerlet(options) {
 			radius,
 			mass,
 			attraction,
-			velocity,
-			meta
+			velocity
 		}) {
-			this.radius = radius;
-			this.mass = mass;
+			this.initialRadius = radius;
+			this.initialMass = mass;
 			this.attraction = attraction;
-			this.meta = meta || {};
 
 			this.verletPoint = new Point3D({
 				position: [ position.x, position.y, position.z ],
@@ -45,7 +43,7 @@ function MyVerlet(options) {
 	}
 
 	this.points = [];
-	this.constraints = new Set();
+	this.constraints = [];
 
 	this.addPoint = options => {
 		const p = new VerletThreePoint(options);
@@ -71,17 +69,17 @@ function MyVerlet(options) {
 		};
 
 		const c = new Constraint3D([p1.verletPoint, p2.verletPoint], options);
-		this.constraints.add(c);
-		return c;
+		this.constraints.push(c);
+		return this.constraints.indexOf(c);
 	};
 
 	this.size = options.size;
 
 	this.world = new World3D({ 
 		gravity: options.gravity ? [0, -9.8, 0] : undefined,
-		min: [-this.size.x/2, 0, -this.size.z/2],
-		max: [this.size.x/2, this.size.y, this.size.z/2],
-		friction: 0.98
+		min: [-this.size.x/2, -this.size.y/2, -this.size.z/2],
+		max: [this.size.x/2, this.size.y/2, this.size.z/2],
+		friction: 0.99
 	});
 
 	let oldT = 0;
@@ -117,11 +115,10 @@ self.addEventListener('message', function(event) {
 					event.data.points = verlet.points.map(p => ({
 						radius: p.radius,
 						position: {
-							x: p.verletPoint.position[0],
-							y: p.verletPoint.position[1],
-							z: p.verletPoint.position[2]
+							x: p.verletPoint.position[0].toPrecision(3),
+							y: p.verletPoint.position[1].toPrecision(3),
+							z: p.verletPoint.position[2].toPrecision(3)
 						},
-						meta: p.meta,
 						id: p.id
 					}));
 					return;
@@ -129,11 +126,25 @@ self.addEventListener('message', function(event) {
 				case 'connectPoints':
 					const p1 = verlet.points[event.data.options.p1.id];
 					const p2 = verlet.points[event.data.options.p2.id];
-					verlet.connect(p1, p2, event.data.options.constraintOptions);
+					event.data.constraintId = verlet.connect(p1, p2, event.data.options.constraintOptions);
+					return;
+
+				case 'updateConstraint':
+					const c = verlet.constraints[event.data.options.constraintId];
+					if (event.data.options.stiffness !== undefined) c.stiffness = event.data.options.stiffness;
+					if (event.data.options.restingDistance !== undefined) c.restingDistance = event.data.options.restingDistance;
 					return;
 
 				case 'addPoint':
 					event.data.point = verlet.addPoint(event.data.pointOptions);
+					return;
+
+				case 'updatePoint':
+					const d = event.data.pointOptions;
+					const p3 = verlet.points[d.id];
+					if (d.position !== undefined) p3.verletPoint.place([d.position.x, d.position.y, d.position.z]);
+					if (d.velocity !== undefined) p3.verletPoint.addForce([d.velocity.x, d.velocity.y, d.velocity.z]);
+					if (d.mass !== undefined) p3.verletPoint.mass = d.mass;
 					return;
 
 				case 'reset':
@@ -154,7 +165,7 @@ self.addEventListener('message', function(event) {
 			}
 		})
 		.then(function () {
-			event.ports[0].postMessage(event.data);
+			event.ports[0].postMessage(JSON.stringify(event.data));
 		});
 });
 

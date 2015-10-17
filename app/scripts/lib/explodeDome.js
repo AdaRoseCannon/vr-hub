@@ -3,12 +3,13 @@
 
 module.exports = function setUpExplodingDome(dome, three, verlet) {
 
-	require('./breakGeometryIntoVerletFaces')(dome.geometry, three, verlet)
-	.then(setUpFallingAndReconstruction);
+	return require('./breakGeometryIntoVerletFaces')(dome.geometry, three, verlet)
+	.then(setUpFallingAndReconstructionController);
 
 
-	function setUpFallingAndReconstruction(newGeom) {
+	function setUpFallingAndReconstructionController(newGeom) {
 
+		let destroyed = false;
 		const timeouts = [];
 		const fallRate = 500;
 		const newDome = new THREE.Mesh(
@@ -52,7 +53,7 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 			});
 		}
 
-		window.addEventListener('dblclick', function () {
+		function restore() {
 			while(timeouts.length) {
 				clearTimeout(timeouts.pop());
 			}
@@ -73,15 +74,25 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 				}), 2000 * Math.random()));
 			});
 			newGeom.faces.forEach(face => face.falling = false);
-		});
+			destroyed = false;
+		}
 
-		window.addEventListener('click', function () {
+		function destroy() {
 			const raycaster = new THREE.Raycaster();
 			raycaster.setFromCamera(new THREE.Vector2(0,0), three.camera);
 			const hits = raycaster.intersectObjects([newDome]);
 			if (hits.length) {
 				recursiveFall(hits[0].face);
 			}
-		});
+			destroyed = true;
+		}
+
+		return {
+			destroy,
+			restore,
+			toggle() {
+				(destroyed ? restore : destroy)();
+			}
+		};
 	}
 };

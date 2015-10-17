@@ -46,6 +46,8 @@ serviceWorker()
 .then(three => {
 	console.log('Ready');
 
+	three.useSky();
+
 	const dome = three.pickObjects(three.scene, 'dome').dome;
 	three.scene.remove(dome);
 
@@ -99,8 +101,10 @@ serviceWorker()
 		three.hud.add(sprite);
 
 		// Set up the dome breaking down and building back
-		require('./lib/explodeDome')(dome, three, verlet);
-
+		require('./lib/explodeDome')(dome, three, verlet)
+		.then(domeController => {
+			window.addEventListener('dblclick', () => domeController.toggle());
+		});	
 
 		function reset() {
 			three.camera.position.set(0, three.camera.height, 0);

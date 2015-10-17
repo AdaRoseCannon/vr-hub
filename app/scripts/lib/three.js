@@ -16,7 +16,7 @@ reflectionCube.format = THREE.RGBFormat;
 
 const materials = {
 	shiny: new THREE.MeshPhongMaterial( { color: 0x99ff99, specular: 0x440000, envMap: reflectionCube, combine: THREE.MixOperation, reflectivity: 0.3, metal: true} ),
-	boring2: new THREE.MeshPhongMaterial( { color: 0xC0B9BB, specular: 0, shading: THREE.FlatShading, side: THREE.DoubleSide, transparent: true, opacity: 0.95 } ),
+	boring2: new THREE.MeshPhongMaterial( { color: 0xC0B9BB, specular: 0, shading: THREE.FlatShading, side: THREE.DoubleSide, transparent: true, opacity: 0.2 } ),
 	wireframe: new THREE.MeshBasicMaterial( { color: 0xFFFFFF, wireframe: true } )
 };
 
@@ -173,6 +173,13 @@ function MyThree(scene, target = document.body){
 		effect.focalLength = 0.25;
 		effect.setSize( window.innerWidth, window.innerHeight );
 		this.renderMethod = effect;
+	};
+
+	this.useSky = () => {
+		const skyBox = require('./sky')();
+		this.skyBox = skyBox;
+		scene.add(skyBox);
+		skyBox.scale.multiplyScalar(0.00004);
 	};
 
 	this.deviceOrientation = ({manualControl}) => {

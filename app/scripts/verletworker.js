@@ -102,70 +102,79 @@ let verlet;
 
 // Recieve messages from the client and reply back onthe same port
 self.addEventListener('message', function(event) {
-		Promise.resolve()
-		.then(function () {
+		
+		const data = JSON.parse(event.data);
+		Promise.all(data.map(({message, id}) => new Promise(
+			function (resolve, reject) {
+				const i = message;
 
-			switch(event.data.action) {
-				case 'init':
-					verlet = new MyVerlet(event.data.options);
-					return;
+				switch(i.action) {
+					case 'init':
+						verlet = new MyVerlet(i.options);
+						return resolve();
 
-				case 'getPoints':
-					verlet.animate();
-					event.data.points = verlet.points.map(p => ({
-						radius: p.radius,
-						position: {
-							x: p.verletPoint.position[0].toPrecision(3),
-							y: p.verletPoint.position[1].toPrecision(3),
-							z: p.verletPoint.position[2].toPrecision(3)
-						},
-						id: p.id
-					}));
-					return;
+					case 'getPoints':
+						verlet.animate();
+						return resolve({
+								points: verlet.points.map(p => ({
+									radius: p.radius,
+									position: {
+										x: p.verletPoint.position[0].toPrecision(3),
+										y: p.verletPoint.position[1].toPrecision(3),
+										z: p.verletPoint.position[2].toPrecision(3)
+									},
+									id: p.id
+								}))
+							});
 
-				case 'connectPoints':
-					const p1 = verlet.points[event.data.options.p1.id];
-					const p2 = verlet.points[event.data.options.p2.id];
-					event.data.constraintId = verlet.connect(p1, p2, event.data.options.constraintOptions);
-					return;
+					case 'connectPoints':
+						const p1 = verlet.points[i.options.p1.id];
+						const p2 = verlet.points[i.options.p2.id];
+						return resolve({
+							constraintId: verlet.connect(p1, p2, i.options.constraintOptions)
+						});
 
-				case 'updateConstraint':
-					const c = verlet.constraints[event.data.options.constraintId];
-					if (event.data.options.stiffness !== undefined) c.stiffness = event.data.options.stiffness;
-					if (event.data.options.restingDistance !== undefined) c.restingDistance = event.data.options.restingDistance;
-					return;
+					case 'updateConstraint':
+						const c = verlet.constraints[i.options.constraintId];
+						if (i.options.stiffness !== undefined) c.stiffness = i.options.stiffness;
+						if (i.options.restingDistance !== undefined) c.restingDistance = i.options.restingDistance;
+						return resolve();
 
-				case 'addPoint':
-					event.data.point = verlet.addPoint(event.data.pointOptions);
-					return;
+					case 'addPoint':
+						return resolve({
+							point: verlet.addPoint(i.pointOptions)
+						});
 
-				case 'updatePoint':
-					const d = event.data.pointOptions;
-					const p3 = verlet.points[d.id];
-					if (d.position !== undefined) p3.verletPoint.place([d.position.x, d.position.y, d.position.z]);
-					if (d.velocity !== undefined) p3.verletPoint.addForce([d.velocity.x, d.velocity.y, d.velocity.z]);
-					if (d.mass !== undefined) p3.verletPoint.mass = d.mass;
-					return;
+					case 'updatePoint':
+						const d = i.pointOptions;
+						const p3 = verlet.points[d.id];
+						if (d.position !== undefined) p3.verletPoint.place([d.position.x, d.position.y, d.position.z]);
+						if (d.velocity !== undefined) p3.verletPoint.addForce([d.velocity.x, d.velocity.y, d.velocity.z]);
+						if (d.mass !== undefined) p3.verletPoint.mass = d.mass;
+						return resolve();
 
-				case 'reset':
-					verlet.points.splice(0);
-					return;
+					case 'reset':
+						verlet.points.splice(0);
+						return resolve();
 
-				default:
-					throw Error('Invalid Action');
-			}
-		})
-		.then(function () {
-			event.data.success = true;
-		}, function (err) {
-			console.log(err);
-			event.data.success = false;
-			if (err) {
-				event.data.message = err.message ? err.message : err;
-			}
-		})
-		.then(function () {
-			event.ports[0].postMessage(JSON.stringify(event.data));
+					default:
+						throw Error('Invalid Action');
+				}
+			})
+			.then(function (o = {}) {
+				o.id = id;
+				return o;
+			}, function (err) {
+				console.log(err);
+				const o = {};
+				if (err) {
+					o.error = err.message ? err.message : err;
+				}
+				return o;
+			})
+		))
+		.then(function (response) {
+			event.ports[0].postMessage(JSON.stringify(response));
 		});
 });
 

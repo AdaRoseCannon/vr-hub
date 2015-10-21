@@ -2,6 +2,7 @@
 'use strict';
 const addScript = require('./lib/loadScript');
 const VerletWrapper = require('./lib/verletwrapper');
+const TWEEN = require('tween.js');
 
 // no hsts so just redirect to https
 if (window.location.protocol !== "https:" && window.location.hostname !== 'localhost') {
@@ -49,6 +50,7 @@ serviceWorker()
 	three.useSky();
 
 	const dome = three.pickObjects(three.scene, 'dome').dome;
+	dome.material = three.materials.boring2;
 	three.scene.remove(dome);
 
 	const grid = new THREE.GridHelper( 10, 1 );
@@ -71,8 +73,6 @@ serviceWorker()
 	pLight2.position.set( -8, -3, -3 );
 	three.scene.add( pLight2 );
 
-	dome.material = three.materials.boring2;
-
 	three.deviceOrientation({manualControl: true});
 
 	// Run the verlet physics
@@ -86,12 +86,18 @@ serviceWorker()
 		gravity: true
 	})
 	.then(function () {
-			
-		requestAnimationFrame(function animate() {
-			verlet.getPoints().then(points => {
-				three.updateObjects(points);
-				three.animate();
-			});
+		
+		let waitingForPoints = false;
+		requestAnimationFrame(function animate(time) {
+			if (!waitingForPoints) {
+				verlet.getPoints().then(points => {
+					three.updateObjects(points);
+					waitingForPoints = false;
+				});
+				waitingForPoints = true;
+			}
+			three.animate();
+			TWEEN.update(time);
 			requestAnimationFrame(animate);
 		});
 
@@ -100,10 +106,54 @@ serviceWorker()
 		const sprite = new THREE.Sprite(material);
 		three.hud.add(sprite);
 
+		function loadDoc(url) {
+			return new Promise(resolve => {
+				setTimeout(() => resolve(url), 3000);
+			});
+		}
+
+		function removeDoc() {
+			return;
+		}
+
 		// Set up the dome breaking down and building back
 		require('./lib/explodeDome')(dome, three, verlet)
 		.then(domeController => {
 			window.addEventListener('dblclick', () => domeController.toggle());
+			window.addEventListener('touchend', () => domeController.toggle());
+
+			function tweenDomeOpacity(opacity, time = 1000) {
+				if (opacity !== undefined && opacity !== dome.material.opacity) {
+					return new Promise(resolve => new TWEEN.Tween(dome.material)
+					    .to({ opacity }, time)
+					    .easing(TWEEN.Easing.Cubic.Out)
+					    .start()
+					    .onComplete(resolve));
+				} else {
+					return Promise.resolve();
+				}
+			}
+
+			function showDocument(url) {
+				tweenDomeOpacity(1)
+				.then(() => three.skyBox.visible = false)
+				.then(() => loadDoc(url))
+				.then(() => domeController.destroy())
+				.then(() => tweenDomeOpacity(0, 4000))
+				.then(() => domeController.mesh.visible = false);
+			}
+
+			function closeDocument() {
+				domeController.mesh.visible = true;
+				tweenDomeOpacity(1)
+				.then(() => domeController.restore())
+				.then(() => removeDoc())
+				.then(() => three.skyBox.visible = true)
+				.then(() => tweenDomeOpacity(0.2));
+			}
+
+			window.showDocument = showDocument;
+			window.closeDocument = closeDocument;
 		});	
 
 		function reset() {

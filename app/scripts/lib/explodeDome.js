@@ -14,7 +14,7 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 		const fallRate = 500;
 		const newDome = new THREE.Mesh(
 			newGeom,
-			three.materials.boring2
+			dome.material
 		);
 		three.scene.add(newDome);
 
@@ -25,13 +25,13 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 
 		function faceFall(f) {
 			f.positionConstraintIds.forEach(constraintId => {
-				timeouts.push(setTimeout(() => verlet.updateConstraint({
+				verlet.updateConstraint({
 					constraintId,
 					stiffness: 0
-				}), Math.random() * fallRate * 0.5));
+				});
 			});
 			f.vertexVerletIds.forEach(id => {
-				timeouts.push(setTimeout(() => verlet.updatePoint({
+				verlet.updatePoint({
 					id,
 					mass: 1,
 					velocity: {
@@ -39,7 +39,7 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 						y: 0.5 * (Math.random() - 0.5),
 						z: 0.5 * (Math.random() - 0.5),
 					}
-				}), Math.random() * fallRate * 0.5));
+				});
 			});
 		}
 
@@ -54,37 +54,42 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 		}
 
 		function restore() {
-			while(timeouts.length) {
-				clearTimeout(timeouts.pop());
-			}
-			newGeom.positionConstraintIds.forEach(constraintId => {
-				verlet.updateConstraint({constraintId, stiffness: 0.3 });
-				timeouts.push(setTimeout(() => verlet.updateConstraint({constraintId, stiffness: 0.4 }), 1000));
-				timeouts.push(setTimeout(() => verlet.updateConstraint({constraintId, stiffness: 0.5 }), 2000));
+			return new Promise(resolve => {
+				while(timeouts.length) {
+					clearTimeout(timeouts.pop());
+				}
+				newGeom.positionConstraintIds.forEach(constraintId => verlet.updateConstraint({constraintId, stiffness: 0.3 }));
+				timeouts.push(setTimeout(() => {
+					newGeom.positionConstraintIds.forEach(constraintId => verlet.updateConstraint({constraintId, stiffness: 0.5 }));
+					newGeom.vertexVerletIds.forEach(id => {
+						verlet.updatePoint({
+							id,
+							mass: 0,
+							position: {
+								x: newGeom.vertexVerletPositions[id].x,
+								y: newGeom.vertexVerletPositions[id].y,
+								z: newGeom.vertexVerletPositions[id].z
+							}
+						});
+					});
+					setTimeout(() => resolve(), fallRate);
+				}, fallRate));
+				newGeom.faces.forEach(face => face.falling = false);
+				destroyed = false;
 			});
-			newGeom.vertexVerletIds.forEach(id => {
-				timeouts.push(setTimeout(() => verlet.updatePoint({
-					id,
-					mass: 0,
-					position: {
-						x: newGeom.vertexVerletPositions[id].x,
-						y: newGeom.vertexVerletPositions[id].y,
-						z: newGeom.vertexVerletPositions[id].z
-					}
-				}), 2000 * Math.random()));
-			});
-			newGeom.faces.forEach(face => face.falling = false);
-			destroyed = false;
 		}
 
 		function destroy() {
-			const raycaster = new THREE.Raycaster();
-			raycaster.setFromCamera(new THREE.Vector2(0,0), three.camera);
-			const hits = raycaster.intersectObjects([newDome]);
-			if (hits.length) {
-				recursiveFall(hits[0].face);
-			}
-			destroyed = true;
+			return new Promise(resolve => {
+				const raycaster = new THREE.Raycaster();
+				raycaster.setFromCamera(new THREE.Vector2(0,0), three.camera);
+				const hits = raycaster.intersectObjects([newDome]);
+				if (hits.length) {
+					recursiveFall(hits[0].face);
+				}
+				destroyed = true;
+				resolve();
+			});
 		}
 
 		return {
@@ -92,7 +97,8 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 			restore,
 			toggle() {
 				(destroyed ? restore : destroy)();
-			}
+			},
+			mesh: newDome
 		};
 	}
 };

@@ -103,27 +103,34 @@ function breakGeometryIntoVerletFaces(g, three, verlet) {
 	.then(function () {
 
 		// All the points which are 'the same' loosely connect them.
-		connections.forEach((pointsToConnect, i) => {
+		return Promise.all(connections.map((pointsToConnect, i) => {
 
-			makeAnchor(g.vertices[i]).then(anchor => {
-				pointsToConnect.forEach((p, i) => {
-					verlet.connectPoints(p.verletPoint, anchor, {
+			return makeAnchor(g.vertices[i])
+			.then(anchor => {
+				return Promise.all(pointsToConnect.map((p, i) => {
+					pointsToConnect.forEach(oP => {
+						if (oP.face !== p.face) {
+							p.face.adjacentFaces.add(oP.face);
+						}
+					});
+					return verlet.connectPoints(p.verletPoint, anchor, {
 						stiffness: 0.6,
 						restingDistance: 0.01
 					}).then(c => {
 						p.face.positionConstraintIds.push(c.constraintId);
 						newGeom.positionConstraintIds.push(c.constraintId);
 					});
-					pointsToConnect.forEach(oP => {
-						if (oP.face !== p.face) {
-							p.face.adjacentFaces.add(oP.face);
-						}
-					});
-				});
+				}));
 			});
-		});
+		}));
+	})
+	.then(function () {
+
 		newGeom.verticesNeedUpdate = true;
 		newGeom.normalsNeedUpdate = true;
+
+		// Convert Set into Array
+		newGeom.faces.forEach(f => f.adjacentFaces = [...f.adjacentFaces]);
 		return newGeom;
 	});
 }

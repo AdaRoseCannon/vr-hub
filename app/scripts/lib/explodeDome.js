@@ -24,15 +24,16 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 		});
 
 		function faceFall(f) {
-			f.positionConstraintIds.forEach(constraintId => {
+			if (!f) return;
+			for(let i=0; i < 3;i++) {
+				const constraintId = f.positionConstraintIds[i];
+				const verletId = f.vertexVerletIds[i];
 				verlet.updateConstraint({
 					constraintId,
 					stiffness: 0
 				});
-			});
-			f.vertexVerletIds.forEach(id => {
 				verlet.updatePoint({
-					id,
+					id: verletId,
 					mass: 1,
 					velocity: {
 						x: 0.5 * (Math.random() - 0.5),
@@ -40,17 +41,19 @@ module.exports = function setUpExplodingDome(dome, three, verlet) {
 						z: 0.5 * (Math.random() - 0.5),
 					}
 				});
-			});
+			}
 		}
 
 		function recursiveFall(startFace) {
 			faceFall(startFace);
-			startFace.adjacentFaces.forEach(f => {
+			const l = startFace.adjacentFaces.length;
+			for (let i=0; i<l; i++) {
+				const f = startFace.adjacentFaces[i];
 				if (!f.falling) {
 					f.falling = true;
-					timeouts.push(setTimeout(() => recursiveFall(f), fallRate));
+					timeouts.push(setTimeout(recursiveFall, fallRate, f));
 				}
-			});
+			}
 		}
 
 		function restore() {

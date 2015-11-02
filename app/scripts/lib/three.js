@@ -64,6 +64,7 @@ function MyThree(scene, target = document.body){
 
 	target.appendChild(renderer.domElement);
 	this.domElement = renderer.domElement;
+	this.domElement.style.position = 'fixed';
 
 	this.materials = materials;
 

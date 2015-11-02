@@ -1,8 +1,18 @@
 /*global THREE*/
 'use strict';
-const addScript = require('./lib/loadScript');
-const VerletWrapper = require('./lib/verletwrapper');
+const addScript = require('./lib/loadScript'); // Promise wrapper for script loading
+const VerletWrapper = require('./lib/verletwrapper'); // Wrapper of the verlet worker
+const VRTarget = require('./lib/vrtarget'); // Append iframes to the page and provide a control interface
 const TWEEN = require('tween.js');
+
+const STATE_PAUSED = 0;
+const STATE_PLAYING = 1;
+
+const STATE_HUB_OPEN = 0;
+const STATE_HUB_CLOSED = 1;
+
+let animState = STATE_PLAYING;
+let hubState = STATE_HUB_OPEN;
 
 // no hsts so just redirect to https
 if (window.location.protocol !== "https:" && window.location.hostname !== 'localhost') {
@@ -47,7 +57,10 @@ serviceWorker()
 .then(three => {
 	console.log('Ready');
 
+	const frame = new VRTarget();
+
 	three.useSky();
+	three.useCardboard();
 
 	const dome = three.pickObjects(three.scene, 'dome').dome;
 	dome.material = three.materials.boring2;
@@ -89,6 +102,8 @@ serviceWorker()
 		
 		let waitingForPoints = false;
 		requestAnimationFrame(function animate(time) {
+			requestAnimationFrame(animate);
+			if (animState !== STATE_PLAYING) return;
 			if (!waitingForPoints) {
 				verlet.getPoints().then(points => {
 					three.updateObjects(points);
@@ -98,7 +113,6 @@ serviceWorker()
 			}
 			three.animate();
 			TWEEN.update(time);
-			requestAnimationFrame(animate);
 		});
 
 		const map = THREE.ImageUtils.loadTexture( "images/reticule.png" );
@@ -107,12 +121,19 @@ serviceWorker()
 		three.hud.add(sprite);
 
 		function loadDoc(url) {
-			return new Promise(resolve => {
-				setTimeout(() => resolve(url), 3000);
+
+			// Display the loading graphic
+
+			// Get the frame to show 
+			return frame.load(url)
+			.then(() => {
+				// remove the loading graphic
+				console.log('loaded %s', url);
 			});
 		}
 
 		function removeDoc() {
+			frame.unload();
 			return;
 		}
 
@@ -135,19 +156,29 @@ serviceWorker()
 			}
 
 			function showDocument(url) {
+				hubState = STATE_HUB_CLOSED;
 				tweenDomeOpacity(1)
 				.then(() => three.skyBox.visible = false)
 				.then(() => loadDoc(url))
 				.then(() => domeController.destroy())
 				.then(() => tweenDomeOpacity(0, 4000))
-				.then(() => domeController.mesh.visible = false);
+				.then(() => {
+					if (hubState === STATE_HUB_CLOSED) {
+						three.domElement.style.pointerEvents = 'none';
+						domeController.mesh.visible = false;
+						animState = STATE_PAUSED;
+					}
+				});
 			}
 
 			function closeDocument() {
+				hubState = STATE_HUB_OPEN;
+				console.log(animState);
+				animState = STATE_PLAYING;
 				domeController.mesh.visible = true;
-				tweenDomeOpacity(1)
-				.then(() => domeController.restore())
+				Promise.all([domeController.restore(), tweenDomeOpacity(1, 2000)])
 				.then(() => removeDoc())
+				.then(() => three.domElement.style.pointerEvents = 'auto')
 				.then(() => three.skyBox.visible = true)
 				.then(() => tweenDomeOpacity(0.2));
 			}
@@ -162,9 +193,6 @@ serviceWorker()
 
 		// Set initial properties
 		reset();
-
-		// Add a buton to put it into cardboard mode
-		require('./lib/cardboardButton')(three);
 
 		window.three = three;
 	});

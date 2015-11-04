@@ -5,51 +5,25 @@ const util = require('util');
 
 /*global THREE*/
 
-module.exports = function GoTargetConfig(three, goTargetsConfig) {
+module.exports = function GoTargetConfig(three) {
 
-	function GoTarget(id, config, node) {
+	function GoTarget(node) {
 
 		EventEmitter.call(this);
-		this.id = id;
-		node.name = id + '_anchor';
-
-		if (config.sprite) {
-			const map = THREE.ImageUtils.loadTexture( "images/" + config.sprite );
-			const material = new THREE.SpriteMaterial( { map: map, color: 0xffffff, fog: false, transparent: true } );
-			const reticuleSprite = new THREE.Sprite(material);
-
-			node.add(reticuleSprite);
-			reticuleSprite.scale.set(node.scale.x, node.scale.y, node.scale.z);
-			reticuleSprite.name = id;
-			this.sprite = reticuleSprite;
-		}
-
-		if (config.text) {
-			this.textSprite = textSprite(config.text, {
-				fontsize: 18,
-				fontface: 'Iceland',
-				borderThickness: 20
-			});
-			this.textSprite.visible = false;
-			node.add(this.textSprite);
-		}
 
 		this.position = node.position;
-		this._anchor = node;
 		this.hasHover = false;
+		this.sprite = node;
+		this.sprite.material.opacity = 0.5;
 
 		this.on('hover', () => {
 			this.hasHover = true;
-			if (this.textSprite) {
-				this.textSprite.visible = true;
-			}
+			this.sprite.material.opacity = 1;
 		});
 
 		this.on('hoverOut', () => {
 			this.hasHover = false;
-			if (this.textSprite) {
-				this.textSprite.visible = false;
-			}
+			this.sprite.material.opacity = 0.5;
 		});
 
 		this.hide = () =>{
@@ -62,13 +36,13 @@ module.exports = function GoTargetConfig(three, goTargetsConfig) {
 	}
 	util.inherits(GoTarget, EventEmitter);
 
-	this.targets = {};
+	this.targets = new Map();
 
 	three.on('prerender', () => {
 		const raycaster = new THREE.Raycaster();
 		raycaster.setFromCamera(new THREE.Vector2(0,0), three.camera);
 		const hits = raycaster.intersectObjects(
-			this.getTargets()
+			Array.from(this.targets.values())
 			.map(target => target.sprite)
 			.filter(sprite => sprite.visible)
 		);
@@ -78,14 +52,13 @@ module.exports = function GoTargetConfig(three, goTargetsConfig) {
 		if (hits.length) {
 
 			// Show hidden text sprite child
-			target = this.getTarget(hits[0].object.name);
+			target = this.targets.get(hits[0].object);
 			if (target) target.emit('hover');
 		}
 
 		// if it is not the one just marked for highlight
 		// and it used to be highlighted un highlight it.
-		Object.keys(this.targets)
-		.map(key => this.targets[key])
+		Array.from(this.targets.values())
 		.filter(eachTarget => eachTarget !== target)
 		.forEach(eachNotHit => {
 			if (eachNotHit.hasHover) eachNotHit.emit('hoverOut');
@@ -93,8 +66,7 @@ module.exports = function GoTargetConfig(three, goTargetsConfig) {
 	});
 
 	const interact = (event) => {
-		this.getTargets()
-		.forEach(target => {
+		Array.from(this.targets.values()).forEach(target => {
 			if (target.hasHover) {
 				target.emit(event.type);
 			}
@@ -111,24 +83,9 @@ module.exports = function GoTargetConfig(three, goTargetsConfig) {
 		interact({type: 'click'});
 	});
 
-	this.getTarget = (id) => {
-		return this.targets[id];
+	this.makeTarget = node => {
+		const newTarget = new GoTarget(node);
+		this.targets.set(node, newTarget);
+		return newTarget;
 	};
-
-	this.collectGoTargets = (root) => {
-		if (root.children) {
-			root.children.forEach(node => {
-				if (node.name.match(/^gotarget.+$/i)) {
-					const id = node.name;
-					if (!goTargetsConfig[id]) return console.warn('No Config For ' + id);
-					this.targets[id] = new GoTarget(id, goTargetsConfig[id], node);
-				} else {
-					this.collectGoTargets(node);
-				}
-			});
-		}
-		return this;
-	};
-
-	this.getTargets = () => Object.keys(this.targets).map(k => this.targets[k]);
 };

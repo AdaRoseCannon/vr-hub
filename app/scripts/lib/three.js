@@ -35,7 +35,7 @@ function MyThree(scene, target = document.body){
 
 	this.scene = scene || new THREE.Scene();
 
-	const camera = new THREE.PerspectiveCamera( 75, target.scrollWidth / target.scrollHeight, 2, 20 );
+	const camera = new THREE.PerspectiveCamera( 75, target.scrollWidth / target.scrollHeight, 0.5, 20 );
 	camera.height = 2;
 	camera.position.set(0, camera.height, 0);
 	camera.lookAt(new THREE.Vector3(0, camera.height, -9));
@@ -199,7 +199,7 @@ function MyThree(scene, target = document.body){
 		}
 	};
 
-	this.animate = () => {
+	this.render = () => {
 
 		// note: three.js includes requestAnimationFrame shim
 		this.emit('prerender');

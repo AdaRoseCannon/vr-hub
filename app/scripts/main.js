@@ -3,6 +3,8 @@
 const addScript = require('./lib/loadScript'); // Promise wrapper for script loading
 const VerletWrapper = require('./lib/verletwrapper'); // Wrapper of the verlet worker
 const VRTarget = require('./lib/vrtarget'); // Append iframes to the page and provide a control interface
+const textSprite = require('./lib/textSprite'); // Generally sprites from canvas
+const GoTargetWorld = require('./lib/gotargets.js'); // Tool for making interactive VR elements
 const TWEEN = require('tween.js');
 
 const STATE_PAUSED = 0;
@@ -57,7 +59,11 @@ serviceWorker()
 .then(three => {
 	console.log('Ready');
 
-	const frame = new VRTarget();
+	const frame = new VRTarget(); // Setup iframe for loading sites into
+
+	three.deviceOrientation({manualControl: true}); // Allow clicking and dragging
+
+	const goTargetWorld = new GoTargetWorld(three);
 
 	three.useSky();
 	three.useCardboard();
@@ -86,8 +92,6 @@ serviceWorker()
 	pLight2.position.set( -8, -3, -3 );
 	three.scene.add( pLight2 );
 
-	three.deviceOrientation({manualControl: true});
-
 	// Run the verlet physics
 	const verlet = new VerletWrapper();
 	verlet.init({
@@ -111,7 +115,7 @@ serviceWorker()
 				});
 				waitingForPoints = true;
 			}
-			three.animate();
+			three.render();
 			TWEEN.update(time);
 		});
 
@@ -135,6 +139,18 @@ serviceWorker()
 		function removeDoc() {
 			frame.unload();
 			return;
+		}
+
+		function addButton(str) {
+			const sprite = textSprite(str, {
+				fontsize: 18,
+				fontface: 'Iceland',
+				borderThickness: 20
+			});
+			three.scene.add(sprite);
+			sprite.position.set(5,5,5);
+			sprite.material.transparent = true;
+			return goTargetWorld.makeTarget(sprite);
 		}
 
 		// Set up the dome breaking down and building back
@@ -167,11 +183,14 @@ serviceWorker()
 						three.domElement.style.pointerEvents = 'none';
 						domeController.mesh.visible = false;
 						animState = STATE_PAUSED;
+						three.scene.visible = false;
+						three.render();
 					}
 				});
 			}
 
 			function closeDocument() {
+				three.scene.visible = true;
 				hubState = STATE_HUB_OPEN;
 				console.log(animState);
 				animState = STATE_PLAYING;
@@ -185,6 +204,10 @@ serviceWorker()
 
 			window.showDocument = showDocument;
 			window.closeDocument = closeDocument;
+			
+			const lightHouseDemoButton = addButton('Load Demo');
+			lightHouseDemoButton.on('click', () => showDocument('https://adaroseedwards.github.io/cardboard2/index.html#vr'));
+
 		});	
 
 		function reset() {
@@ -193,7 +216,6 @@ serviceWorker()
 
 		// Set initial properties
 		reset();
-
 		window.three = three;
 	});
 });

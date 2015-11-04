@@ -210,8 +210,8 @@ gulp.task('serve:dist', () => {
 gulp.task('ship', function () {
 	return gulp.src('./dist/**/*')
 		.pipe(require('gulp-gh-pages')({
-			origin: 'git@github.com:AdaRoseEdwards/cardboard2.git',
-			remoteUrl: 'git@github.com:AdaRoseEdwards/cardboard2.git',
+			origin: 'git@github.com:AdaRoseEdwards/vr-hub.git',
+			remoteUrl: 'git@github.com:AdaRoseEdwards/vr-hub.git',
 			branch: 'gh-pages'
 		}));
 });

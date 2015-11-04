@@ -35,6 +35,7 @@ function VRTarget(parent) {
 	});
 	iframe.setAttribute('seamless', 'seamless');
 	iframe.setAttribute('mozbrowser', '1');
+	iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
 	this.iframe = iframe;
 	this.parent = parent || document.body;
 	this.parent.insertBefore(this.iframe, this.parent.firstChild);

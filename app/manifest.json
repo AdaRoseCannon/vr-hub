@@ -1,11 +1,10 @@
 {
-  "name": "Ada Rose - Cardboard 2",
+  "name": "VR Hub",
   "icons": [
     {
       "src": "launcher-icon-4x.png",
       "sizes": "192x192",
       "type": "image/png",
-      "density": 4.0
     }
   ],
   "start_url": "index.html",

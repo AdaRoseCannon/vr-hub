@@ -1,57 +1,70 @@
+/**
+ * Sets up an enviroment for detecting that 
+ * the camera is looking at objects.
+ */
+
 'use strict';
-const textSprite = require('./textSprite');
 const EventEmitter = require('fast-event-emitter');
 const util = require('util');
 
 /*global THREE*/
+/**
+ * Keeps track of interactive 3D elements and 
+ * can be used to trigger events on them.
+ *
+ * The domElement is to pick up touch ineractions
+ * 
+ * @param  {[type]} domElement [description]
+ * @return {[type]}            [description]
+ */
+module.exports = function CameraInteractivityWorld(domElement) {
 
-module.exports = function GoTargetConfig(three) {
-
-	function GoTarget(node) {
+	function InteractivityTarget(node) {
 
 		EventEmitter.call(this);
 
 		this.position = node.position;
 		this.hasHover = false;
-		this.sprite = node;
-		this.sprite.material.opacity = 0.5;
+		this.object3d = node;
 
 		this.on('hover', () => {
+			if (!this.hasHover) {
+				this.emit('hoverStart');
+			}
 			this.hasHover = true;
-			this.sprite.material.opacity = 1;
 		});
 
 		this.on('hoverOut', () => {
 			this.hasHover = false;
-			this.sprite.material.opacity = 0.5;
 		});
 
 		this.hide = () =>{
-			this.sprite.visible = false;
+			this.object3d.visible = false;
 		};
 
 		this.show = () =>{
-			this.sprite.visible = true;
+			this.object3d.visible = true;
 		};
 	}
-	util.inherits(GoTarget, EventEmitter);
+	util.inherits(InteractivityTarget, EventEmitter);
 
 	this.targets = new Map();
 
-	three.on('prerender', () => {
+	this.detectInteractions = function (camera) {
+
 		const raycaster = new THREE.Raycaster();
-		raycaster.setFromCamera(new THREE.Vector2(0,0), three.camera);
+		raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
 		const hits = raycaster.intersectObjects(
 			Array.from(this.targets.values())
-			.map(target => target.sprite)
-			.filter(sprite => sprite.visible)
+			.map(target => target.object3d)
+			.filter(object3d => object3d.visible)
 		);
 
 		let target = false;
 
 		if (hits.length) {
 
-			// Show hidden text sprite child
+			// Show hidden text object3d child
 			target = this.targets.get(hits[0].object);
 			if (target) target.emit('hover');
 		}
@@ -63,7 +76,7 @@ module.exports = function GoTargetConfig(three) {
 		.forEach(eachNotHit => {
 			if (eachNotHit.hasHover) eachNotHit.emit('hoverOut');
 		});
-	});
+	};
 
 	const interact = (event) => {
 		Array.from(this.targets.values()).forEach(target => {
@@ -72,19 +85,16 @@ module.exports = function GoTargetConfig(three) {
 			}
 		});
 	};
+	this.interact = interact;
 
-	three.domElement.addEventListener('click', interact);
-	three.domElement.addEventListener('mousedown', interact);
-	three.domElement.addEventListener('mouseup', interact);
-	three.domElement.addEventListener('touchup', interact);
-	three.domElement.addEventListener('touchdown', interact);
-	three.deviceOrientationController
-	.addEventListener('userinteractionend', function () {
-		interact({type: 'click'});
-	});
+	domElement.addEventListener('click', interact);
+	domElement.addEventListener('mousedown', interact);
+	domElement.addEventListener('mouseup', interact);
+	domElement.addEventListener('touchup', interact);
+	domElement.addEventListener('touchdown', interact);
 
 	this.makeTarget = node => {
-		const newTarget = new GoTarget(node);
+		const newTarget = new InteractivityTarget(node);
 		this.targets.set(node, newTarget);
 		return newTarget;
 	};

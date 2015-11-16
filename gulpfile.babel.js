@@ -180,7 +180,7 @@ gulp.task('browserify-reload', ['browserify'], () => {
 gulp.task('serve', ['styles', 'browserify', 'fonts'], () => {
 	browserSync({
 		notify: false,
-		port: 9000,
+		port: 9125,
 		server: {
 			baseDir: ['.tmp', 'app']
 		}

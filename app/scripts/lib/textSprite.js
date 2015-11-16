@@ -43,9 +43,9 @@ function makeTextSprite( message, parameters ) {
 	console.log(measure);
 	const context2 = canvas2.getContext('2d');
 
-	context2.rect(0, 0, canvas2.width, canvas2.height);
-	context2.fillStyle="red";
-	context2.fill();
+	// context2.rect(0, 0, canvas2.width, canvas2.height);
+	// context2.fillStyle="red";
+	// context2.fill();
 
 	setStyle(context2);
 

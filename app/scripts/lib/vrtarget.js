@@ -31,7 +31,8 @@ function VRTarget(parent) {
 		bottom: 0,
 		width: '100%',
 		height: '100%',
-		border: 'none'
+		border: 'none',
+		pointerEvents: 'none'
 	});
 	iframe.setAttribute('seamless', 'seamless');
 	iframe.setAttribute('mozbrowser', '1');
@@ -45,11 +46,19 @@ VRTarget.prototype.load = function (url) {
 	this.iframe.src = url;
 	return new Promise(function (resolve) {
 		this.iframe.addEventListener('load', resolve);
-	}.bind(this));
+	}.bind(this))
+	.then(() => {
+		css(this.iframe, {
+			pointerEvents: 'auto'
+		});
+	});
 };
 
 VRTarget.prototype.unload = function (url) {
 	this.iframe.src = 'about:blank';
+	css(this.iframe, {
+		pointerEvents: 'none'
+	});
 };
 
 
